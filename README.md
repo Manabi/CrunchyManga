@@ -1,10 +1,20 @@
+Update 11/03/17
+====
+CrunchyManga now needs CFScrape in order to work.
+
+
+Simply run `pip install cfscrape`. The PyPI package is at https://pypi.python.org/pypi/cfscrape/
+
+
+Alternatively, clone [this](https://github.com/Anorov/cloudflare-scrape) repository and run `python setup.py install`.
+
 CrunchyManga
 ============
 Download Manga from Crunchyroll (Manga, ComicPo! and Artist Alley)
 
 If you have a premium account you can download all the chapters, series, volumes you want, if not, you'll only be able to download the latest chapters.
 
-When downloading a series from its link, you can choose to download all volumes and individual chapters available (Using your config file), the series as invididual chapters (using the config file) and only the chapters your need (using a parameter), example:
+When downloading a series from its link, you can choose to download all volumes and individual chapters available (Using your config file), the series as invididual chapters (using the config file) and only the chapters your need (using a parameter), example (**If you want to download a single chapter you don't have to do this (the info listed below). You can just use its direct link/url to download the chapterm example: http://www.crunchyroll.com/comics_read/manga?volume_id=1593&chapter_num=1.00**):
 
 	Example 1: http://www.crunchyroll.com/comics/manga/bokura-wa-minna-kawaisou/volumes [1-15, 25, 50]
 	
@@ -19,6 +29,8 @@ When downloading a series from its link, you can choose to download all volumes 
 	Example 4 (Using CLI and windows executable): CrunchyManga.exe -u "http://www.crunchyroll.com/comics/manga/bokura-wa-minna-kawaisou/volumes [1-15, 25, 50]"
 	
 	Please note that even if you have the download_volumes option activated, the chapters will be downloaded as individual chapters.
+	
+	
 
 - Config file, this file is created once you run the script. You can edit as you like, but, if you edit it while the script is running, please restart the script. The options:
 

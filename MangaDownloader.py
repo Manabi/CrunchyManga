@@ -1,13 +1,13 @@
 #!/usr/bin/env python2.7
 # -*- coding: cp1252 -*-
 about='''
-Crunchyroll MangaDownloader v0.3.2 (Crunchymanga v0.3.2 for short).
+Crunchyroll MangaDownloader v0.3.2.4 (Crunchymanga v0.3.2.4 for short).
 All credit goes to Miguel A(Touman).
 You can use this script as suits you. Just do not forget to leave the credit.
 
-If you are in any doubt whatsoever about how to use this script do not hesitate to tell me. Contact me at 7ouman@gmail.com and I'll try to respond as soon as possible.
+If you are in any doubt whatsoever about how to use this script do not hesitate to tell me. Contact me at 7ouman@gmail.com and I'll try to reply as soon as possible.
 
-Beautifulsoup is the only external library used.
+Beautifulsoup and cfscrape (with its dependencies) are the only external libraries used.
 
 https://github.com/7ouma/CrunchyManga
 '''
@@ -27,12 +27,16 @@ import urllib
 from os import path
 import argparse
 from zipfile import *
+import cfscrape
+from cookielib import LWPCookieJar
 
 class MangaDownloader():
 
     def __init__(self):
         self.directorio = os.getcwd()
         self.read_config()
+        self.scraper = cfscrape.create_scraper()
+        self.UserAgent = "Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/52.0.2743.116 Safari/537.36"
 
 
     def xord(self,bytear, key):
@@ -223,46 +227,38 @@ class MangaDownloader():
         try:
                 with open('cookies.txt'): pass
         except (OSError, IOError):
-                cookies = cookielib.MozillaCookieJar('cookies.txt')
-                cookies.save()
-        cookies = cookielib.MozillaCookieJar('cookies.txt')
-        cookies.load() 
-        opener = urllib2.build_opener(
-            urllib2.HTTPRedirectHandler(),
-            urllib2.HTTPHandler(debuglevel=0),
-            urllib2.HTTPSHandler(debuglevel=0),
-            urllib2.HTTPCookieProcessor(cookies))
-        opener.addheaders =[('Referer', 'http://www.crunchyroll.com'),('User-Agent','Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.14) Gecko/20080404 Firefox/2.0.0.14')]
-        response = opener.open(url)
-        html = response.read()
-        cookies.save()
+                cookies = LWPCookieJar('cookies.txt')
+                cookies.save()      
+        cookies = self.scraper
+        cookies.cookies = LWPCookieJar('cookies.txt')
+        cookies.cookies.load()
+        html = self.scraper.get(url).content
+        cookies.cookies.save()
         return html
     #
     def login(self,usuario,password):
         try:
                 with open('cookies.txt'): pass
         except IOError:
-                cookies = cookielib.MozillaCookieJar('cookies.txt')
+                cookies = LWPCookieJar('cookies.txt')
                 cookies.save()
-        url = 'https://www.crunchyroll.com/?a=formhandler'
-        data = {'formname' : 'RpcApiUser_Login', 'fail_url' : 'http://www.crunchyroll.com/login', 'name' : usuario, 'password' : password}
-        cookies = cookielib.MozillaCookieJar('cookies.txt')
-        cookies.load() 
-        opener = urllib2.build_opener(
-            urllib2.HTTPRedirectHandler(),
-            urllib2.HTTPHandler(debuglevel=0),
-            urllib2.HTTPSHandler(debuglevel=0),
-            urllib2.HTTPCookieProcessor(cookies))
-        opener.addheaders =[('Referer', "http://www.crunchyroll.com"),('User-Agent','Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.14) Gecko/20080404 Firefox/2.0.0.14')]
-        req = opener.open(url, urllib.urlencode(data))
+        url = 'https://www.crunchyroll.com/login'
+        cookies = self.scraper
+        cookies.cookies = LWPCookieJar('cookies.txt')
+        page = self.scraper.get(url).content
+        page = BeautifulSoup(page)
+        hidden = page.findAll("input",{u"type":u"hidden"})
+        hidden = hidden[1].get("value")
+        logindata = {'formname' : 'login_form', 'fail_url' : 'http://www.crunchyroll.com/login', 'login_form[name]' : usuario, 'login_form[password]' : password,'login_form[_token]': hidden,'login_form[redirect_url]':'/'}
+        req = self.scraper.post(url, data = logindata)
         url = "http://www.crunchyroll.com"
-        req = opener.open(url)
-        html = req.read()
+        html = self.scraper.get(url).content
         if re.search(usuario+'(?i)',html):
                 print 'You have been successfully logged in.\n\n'
-                cookies.save()
+                cookies.cookies.save()
         else:
                 print 'Failed to verify your username and/or password. Please try again.\n\n'
+                cookies.cookies.save()
 
     def CrunchyManga(self):
         cc = 1
@@ -272,8 +268,7 @@ class MangaDownloader():
         if chapters_:
             url = self.url.split ("[")
             ch_dwn = url[1]
-            self.url = url[0]
-            
+            self.url = url[0]            
         print "Analyzing link %s..."%self.url
         if re.match(r"^(http:\/\/)(w{3}\.)?(crunchyroll\.com\/comics_read(\/(manga|comipo|artistalley))?\?(volume\_id|series\_id)\=[0-9]+&chapter\_num\=[0-9]+(\.[0-9])?)",self.url): #Crunchyroll por episodios.
             try:
@@ -283,7 +278,7 @@ class MangaDownloader():
                 self.manga_titulo = self.manga_titulo.replace(':',' ')
                 manga = soup.find("object",{u"id":u"showmedia_videoplayer_object"}).find("embed",{u"type":u"application/x-shockwave-flash"}).get("flashvars")
                 manga = manga.split("=")
-                n = len(manga)-1
+                n = len(manga)-2
                 serie_id = manga[1][:manga[1].find('&chapterNumber')]
                 numero_cap = manga[2][:manga[2].find('&server')]
                 if re.match(r"([0-9]+)(\.[0-9]{1,2})",numero_cap):
@@ -298,7 +293,7 @@ class MangaDownloader():
                         self.manga_numcap = numero_cap[:-1]
                 else:
                     self.manga_numcap = numero_cap
-                sesion_id = manga[n]
+                sesion_id = manga[n][:manga[n].find('&config_url')]
             except Exception,e:
                 print "The link is certainly from Crunchyroll, but it seems that it's not correct. Verify it and try again."
                 return
@@ -354,7 +349,7 @@ class MangaDownloader():
                 soup = BeautifulSoup(html)
                 manga = soup.find("object",{u"id":u"showmedia_videoplayer_object"}).find("embed",{u"type":u"application/x-shockwave-flash"}).get("flashvars")
                 manga = manga.split("=")
-                n = len(manga)-1
+                n = len(manga)-2
                 serie_id = manga[1][:manga[1].find('&chapterNumber')]
                 sesion_id = manga[n]
             except:
@@ -467,7 +462,7 @@ class MangaDownloader():
                 soup = BeautifulSoup(html)
                 sesion_id = soup.find("object",{u"id":u"showmedia_videoplayer_object"}).find("embed",{u"type":u"application/x-shockwave-flash"}).get("flashvars")
                 sesion_id = sesion_id.split("=")
-                n = len(sesion_id)-1
+                n = len(sesion_id)-2
                 sesion_id = sesion_id[n]
                 url_serie = "http://api-manga.crunchyroll.com/chapters?series_id="+serie_id
                 html= self.download(url_serie)
@@ -547,7 +542,7 @@ class MangaDownloader():
                     if self.zip and cc > 1 and descarga == 1:
                         self.zipmanga()
                     c = c+1
-                if temp:
+                if ch_dwn is not None and temp:
                     self.d_volumes = True
         else:
             print "ERROR: The link is not from Crunchyroll/Manga"
